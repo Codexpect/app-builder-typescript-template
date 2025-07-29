@@ -1,0 +1,46 @@
+application:
+  hooks:
+    pre-app-build: npm run build
+  runtimeManifest:
+    packages:
+      example-1:
+        license: Apache-2.0
+        actions:
+          process:
+            function: actions/example-1/process/index.js
+            web: "yes"
+            runtime: nodejs:20
+
+            inputs:
+              LOG_LEVEL: debug
+
+              # Adobe Commerce API credentials
+              COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+              COMMERCE_STORE_CODES: $COMMERCE_STORE_CODES
+              COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+              COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+              COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+              COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
+
+              # Adobe IMS API credentials
+              OAUTH_CLIENT_ID: $OAUTH_CLIENT_ID
+              OAUTH_CLIENT_SECRET: $OAUTH_CLIENT_SECRET
+              OAUTH_TECHNICAL_ACCOUNT_ID: $OAUTH_TECHNICAL_ACCOUNT_ID
+              OAUTH_TECHNICAL_ACCOUNT_EMAIL: $OAUTH_TECHNICAL_ACCOUNT_EMAIL
+              OAUTH_ORG_ID: $OAUTH_ORG_ID
+              OAUTH_SCOPES: $OAUTH_SCOPES
+              OAUTH_HOST: $OAUTH_HOST
+
+            annotations:
+              require-adobe-auth: true
+              final: true
+
+      example-2:
+        license: Apache-2.0
+        actions:
+          $include: ./actions-src/example-2/actions.config.yaml
+
+productDependencies:
+  - code: COMMC
+    minVersion: 2.4.4
+    maxVersion: 2.4.8
