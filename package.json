@@ -3,38 +3,42 @@
   "version": "0.0.1",
   "author": "patryk@codexpect.com",
   "dependencies": {
-    "@adobe/aio-lib-ims": "^7.0.2",
-    "@adobe/aio-lib-state": "^5.1.0",
+    "@adobe/aio-lib-ims": "^8.1.1",
+    "@adobe/aio-lib-state": "^5.3.0",
     "@adobe/aio-sdk": "^6",
     "@adobe/commerce-sdk-auth": "file:./packages/commerce-sdk-auth",
-    "@eslint/eslintrc": "^3.3.1",
-    "@eslint/js": "^9.31.0",
-    "axios": "^1.7.9",
+    "@eslint/eslintrc": "^3.3.3",
+    "@eslint/js": "^9.39.1",
+    "axios": "^1.13.2",
     "cloudevents": "^10.0.0",
-    "globals": "^16.3.0",
+    "globals": "^16.5.0",
     "node-fetch": "^3.3.2",
     "oauth-1.0a": "^2.2.6",
     "openwhisk": "^3.21.8",
-    "uuid": "^11.1.0"
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/node": "^24.1.0",
-    "@typescript-eslint/eslint-plugin": "^8.38.0",
-    "@typescript-eslint/parser": "^8.38.0",
-    "eslint": "^9.32.0",
-    "eslint-plugin-jest": "^29.0.1",
-    "jest": "^30.0.5",
-    "ts-jest": "^29.3.2",
+    "@types/node": "^24.10.1",
+    "@typescript-eslint/eslint-plugin": "^8.48.1",
+    "@typescript-eslint/parser": "^8.48.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-jest": "^29.2.1",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.3"
   },
   "scripts": {
     "test": "jest --passWithNoTests ./test --config jest.config.ts",
     "lint": "eslint --ignore-pattern web-src --no-error-on-unmatched-pattern actions-src",
     "lint:fix": "npm run lint -- --fix",
     "build": "tsc",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "workspace:download": "mkdir -p scripts/onboarding/config && aio console workspace download scripts/onboarding/config/workspace.json",
+    "workspace:cleanup": "rm -f scripts/onboarding/config/workspace.json",
+    "pre-app-build": "npm run workspace:download && node --no-warnings -e 'require(\"./hooks/pre-app-build.js\").main()'; npm run workspace:cleanup",
+    "post-app-deploy": "npm run workspace:download && node --no-warnings -e 'require(\"./hooks/post-app-deploy.js\").main()'; npm run workspace:cleanup"
   },
   "engines": {
     "node": ">=18"

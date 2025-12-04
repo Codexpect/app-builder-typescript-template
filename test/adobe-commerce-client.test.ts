@@ -114,7 +114,7 @@ describe("AdobeCommerceClient", () => {
     };
 
     const mockAdobeImsParams: AdobeImsParams = {
-      COMMERCE_BASE_URL: "https://base.example.com/",
+      COMMERCE_BASE_URL: "https://na1-sandbox.admin.commerce.adobe.com/xyz/",
       OAUTH_CLIENT_ID: "test-client-id",
       OAUTH_CLIENT_SECRET: "test-client-secret",
       OAUTH_SCOPES: ["AdobeID", "read_organizations", "openid"],
@@ -174,7 +174,7 @@ describe("AdobeCommerceClient", () => {
       it("should use storeUrl when provided for IMS authentication", () => {
         const storeConfig: StoreConfig = {
           storeCode: "us",
-          storeUrl: "https://us.custom.com/",
+          storeUrl: "https://na1-sandbox.admin.commerce.adobe.com/xyz/",
         };
 
         const client = AdobeCommerceClient.create(mockAdobeImsParams, storeConfig);
@@ -354,10 +354,10 @@ describe("AdobeCommerceClient", () => {
 
     beforeEach(() => {
       const options = {
-        url: "https://example.com/rest/",
+        url: "https://na1-sandbox.admin.commerce.adobe.com/xyz/",
         version: "V1",
         storeCode: "us",
-        useStoreCodeInPath: true,
+        useStoreCodeInPath: false,
         auth: {
           type: "ims" as const,
           ims: {
@@ -396,9 +396,9 @@ describe("AdobeCommerceClient", () => {
       });
 
       expect(mockAxios).toHaveBeenCalledWith({
-        url: "https://example.com/rest/us/V1/products",
+        url: "https://na1-sandbox.admin.commerce.adobe.com/xyz/V1/products",
         method: "GET",
-        headers: { Authorization: "Bearer ims-access-token" },
+        headers: { Authorization: "Bearer ims-access-token", Store: "us" },
         data: undefined,
         responseType: "json",
       });
@@ -500,7 +500,7 @@ describe("AdobeCommerceClient", () => {
 
         expect(mockAxios).toHaveBeenCalledWith(
           expect.objectContaining({
-            url: "https://base.example.com/rest/us/V1orders",
+            url: "https://base.example.com/rest/us/V1/orders",
           })
         );
       });

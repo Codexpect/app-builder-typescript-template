@@ -1,6 +1,6 @@
 application:
   hooks:
-    pre-app-build: npm run build
+    pre-app-build: npm run build && npm run pre-app-build
   runtimeManifest:
     packages:
       example-1:

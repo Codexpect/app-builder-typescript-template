@@ -4,9 +4,9 @@ import crypto from "crypto";
 import Oauth1a from "oauth-1.0a";
 import { logDebug, logError } from "../../logger";
 import { StoreConfig } from "../../types/commerce";
-import { RequestData } from "../../types/oauth";
 import { AdobeImsParams } from "../../types/request";
 import { CommerceParams } from "./types/request";
+import { RequestData } from "../../types/oauth";
 
 export interface OAuth1aConfig {
   consumerKey: string;
@@ -84,7 +84,7 @@ export class AdobeCommerceClient {
    * Creates an AdobeCommerceClient instance with automatic authentication method detection
    *
    * @param params - CommerceParams (for OAuth 1.0a) or AdobeImsParams (for IMS)
-   * @param storeCode - Optional store code
+   * @param storeConfig - Store configuration with storeCode and optional storeUrl
    * @returns AdobeCommerceClient instance
    */
   public static create(params: CommerceParams | AdobeImsParams, storeConfig: StoreConfig): AdobeCommerceClient {
@@ -92,14 +92,14 @@ export class AdobeCommerceClient {
     const useStoreCodeInPath = !storeConfig.storeUrl;
 
     // Detect authentication type based on parameter structure
-    if ("COMMERCE_CONSUMER_KEY" in params) {
+    if ("COMMERCE_CONSUMER_KEY" in params && params.COMMERCE_CONSUMER_KEY !== "") {
       // OAuth 1.0a authentication (has Commerce-specific fields)
       const commerceParams = params as CommerceParams;
       return this.createWithOAuth1a(commerceParams, baseUrl, storeConfig.storeCode, useStoreCodeInPath);
     } else {
       // IMS authentication (has OAUTH_CLIENT_ID but not Commerce fields)
       const adobeImsParams = params as AdobeImsParams;
-      return this.createWithIms(adobeImsParams, baseUrl, storeConfig.storeCode, useStoreCodeInPath);
+      return this.createWithIms(adobeImsParams, baseUrl, storeConfig.storeCode);
     }
   }
 
@@ -107,19 +107,32 @@ export class AdobeCommerceClient {
     adobeImsParams: AdobeImsParams,
     baseUrl: string,
     storeCode?: string,
-    useStoreCodeInPath?: boolean
   ): AdobeCommerceClient {
     const clientOptions: AdobeCommerceClientOptions = {
-      url: `${baseUrl}rest/`,
+      url: `${baseUrl}`,
       version: "V1",
       storeCode,
-      useStoreCodeInPath,
+      useStoreCodeInPath: false,
       auth: {
         type: "ims",
         ims: {
           clientId: adobeImsParams.OAUTH_CLIENT_ID,
           clientSecret: adobeImsParams.OAUTH_CLIENT_SECRET,
-          scopes: adobeImsParams.OAUTH_SCOPES || ["AdobeID", "read_organizations", "openid"],
+          scopes: adobeImsParams.OAUTH_SCOPES || [
+            "AdobeID",
+            "openid",
+            "read_organizations",
+            "additional_info.projectedProductContext",
+            "additional_info.roles",
+            "adobeio_api",
+            "read_client_secret",
+            "manage_client_secrets",
+            "event_receiver_api",
+            "commerce.accs",
+            "profile",
+            "org.read",
+            "email",
+          ],
           host: adobeImsParams.OAUTH_HOST,
         },
       },
@@ -135,7 +148,7 @@ export class AdobeCommerceClient {
     useStoreCodeInPath?: boolean
   ): AdobeCommerceClient {
     const clientOptions: AdobeCommerceClientOptions = {
-      url: `${baseUrl}rest/`,
+      url: `${baseUrl}`,
       version: "V1",
       storeCode,
       useStoreCodeInPath,
@@ -169,9 +182,16 @@ export class AdobeCommerceClient {
         this.imsTokenExpiry = new Date(Date.now() + (tokenResponse.expires_in - 60) * 1000);
       }
 
-      return {
+      const headers: Record<string, string> = {
         Authorization: `Bearer ${this.imsToken}`,
       };
+
+      // Add Store header if storeCode is present
+      if (this.storeCode) {
+        headers.Store = this.storeCode;
+      }
+
+      return headers;
     } else {
       if (!this.oauth || !this.token) {
         throw new Error("OAuth 1.0a is not properly initialized");
@@ -236,10 +256,21 @@ export class AdobeCommerceClient {
   }
 
   private createUrl(resourceUrl: string): string {
-    if (this.useStoreCodeInPath && this.storeCode) {
-      return `${this.serverUrl}${this.storeCode}/${this.apiVersion}${resourceUrl}`;
+    if (resourceUrl.startsWith("/")) {
+      resourceUrl = resourceUrl.slice(1);
     }
-    return `${this.serverUrl}${this.apiVersion}${resourceUrl}`;
+
+    // For IMS auth, URL format is: ${serverUrl}${apiVersion}/${resourceUrl}
+    // Store code is sent via Store header, not in the URL path
+    if (this.authConfig.type === "ims") {
+      return `${this.serverUrl}${this.apiVersion}/${resourceUrl}`;
+    }
+
+    // For OAuth1a auth, use the existing logic with storeCode and apiVersion
+    if (this.useStoreCodeInPath && this.storeCode) {
+      return `${this.serverUrl}${this.storeCode}/${this.apiVersion}/${resourceUrl}`;
+    }
+    return `${this.serverUrl}${this.apiVersion}/${resourceUrl}`;
   }
 
   private async apiCall(
@@ -288,15 +319,30 @@ export class AdobeCommerceClient {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logError(`Error fetching URL ${requestData.url}: ${errorMessage}`);
-      if (
-        error instanceof Error &&
-        "response" in error &&
-        (error as { response?: { data?: unknown } }).response?.data
-      ) {
-        logError(
-          `Error body ${requestData.url}: ${JSON.stringify((error as { response: { data: unknown } }).response.data)}`
-        );
+
+      // Create a minimal error from axios error if applicable (only url and response body)
+      if (error instanceof Error && "response" in error) {
+        const axiosError = error as { response?: { status?: number; data?: unknown } };
+        const responseData = axiosError.response?.data;
+        const statusCode = axiosError.response?.status;
+        const method = requestData.method;
+
+        // Log only minimal details
+        if (responseData !== undefined) {
+          logError(`Error body ${requestData.url}: ${JSON.stringify(responseData)}`);
+        }
+
+        const minimalError = {
+          url: requestData.url,
+          statusCode: statusCode ?? null,
+          responseBody: responseData ?? null,
+          method: method ?? null,
+        } as const;
+
+        throw minimalError;
       }
+
+      // For non-axios errors, throw as-is
       throw error;
     }
   }

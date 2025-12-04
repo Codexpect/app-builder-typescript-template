@@ -108,8 +108,16 @@ app-builder-typescript-template/
 │       └── lib-state/             # State management utilities
 │           └── state-client.ts
 ├── actions/                       # Compiled JavaScript (generated)
+├── hooks/                         # Build and deploy hooks
+│   └── pre-app-build.js          # Pre-build hook script
 ├── packages/                      # Local packages
 │   └── commerce-sdk-auth/         # Adobe Commerce SDK authentication
+├── scripts/                       # Utility scripts
+│   ├── lib/                       # Script utilities
+│   │   └── env.js                # Environment variable utilities
+│   ├── sync-oauth-credentials.js  # OAuth credentials synchronization
+│   ├── sync-workspace-configuration.js  # Workspace configuration sync
+│   └── sync-default-configuration.js  # Default configuration sync
 ├── test/                          # Test files
 ├── app.config.yaml                # Main App Builder configuration
 ├── package.json                   # Dependencies and scripts
@@ -397,14 +405,45 @@ npm run lint
 
 # Fix linting issues
 npm run lint:fix
+
+# Download workspace configuration
+npm run workspace:download
+
+# Cleanup workspace configuration
+npm run workspace:cleanup
 ```
+
+### Build and Deploy Hooks
+
+The template includes automated hooks that run during the build and deploy process:
+
+#### Pre-Build Hook (`pre-app-build`)
+
+Before building the application, the following scripts are automatically executed:
+
+1. **`workspace:download`**: Downloads the current workspace configuration from Adobe App Builder
+2. **`sync-oauth-credentials`**: Syncs OAuth credentials from IMS context environment variables (`AIO_ims_contexts_*`) to standard OAuth environment variables:
+   - Maps IMS context keys to OAuth variables (e.g., `client__id` → `OAUTH_CLIENT_ID`)
+   - Extracts client secrets from JSON format
+   - Updates environment variables if they differ from IMS context values
+3. **`sync-workspace-configuration`**: Syncs workspace configuration from the downloaded workspace.json:
+   - Extracts `IO_PROJECT_ID` from workspace configuration
+   - Extracts `IO_WORKSPACE_ID` from workspace configuration
+   - Extracts `IO_CONSUMER_ID` (organization ID) from workspace configuration
+4. **`sync-default-configuration`**: Sets default values for required configuration:
+   - `IO_MANAGEMENT_BASE_URL`: `https://api.adobe.io/events/`
+   - `OAUTH_HOST`: `https://ims-na1.adobelogin.com`
+5. **`workspace:cleanup`**: Removes the temporary workspace.json file
+
+These hooks ensure that your local environment variables are automatically synchronized with your Adobe App Builder workspace configuration before building.
 
 ### Development Process
 
 1. **Write TypeScript** in `actions-src/`
 2. **Build** with `npm run build` (or use `npm run watch` for development)
 3. **Test** with `npm test`
-4. **Deploy** - Adobe App Builder uses the compiled JavaScript in `actions/`
+4. **Deploy** with `aio app deploy`
+   - The `aio app deploy` command automatically runs `aio app build` in the background, which triggers the `pre-app-build` hook to sync configuration before deployment
 
 ## Environment Variables
 
@@ -427,11 +466,13 @@ The template expects these environment variables for Adobe Commerce integration:
 
 ### Adobe IO Events
 
-- `OAUTH_ORG_ID`: Adobe organization ID
-- `IO_MANAGEMENT_BASE_URL`: IO Events management base URL
-- `IO_CONSUMER_ID`: IO Events consumer ID
-- `IO_PROJECT_ID`: IO Events project ID
-- `IO_WORKSPACE_ID`: IO Events workspace ID
+- `OAUTH_ORG_ID`: Adobe organization ID (synced automatically via hooks)
+- `IO_MANAGEMENT_BASE_URL`: IO Events management base URL (defaults to `https://api.adobe.io/events/` via hooks)
+- `IO_CONSUMER_ID`: IO Events consumer ID (synced automatically via hooks)
+- `IO_PROJECT_ID`: IO Events project ID (synced automatically via hooks)
+- `IO_WORKSPACE_ID`: IO Events workspace ID (synced automatically via hooks)
+
+**Note**: Many of these environment variables are automatically synchronized by the build and deploy hooks. The hooks extract values from your Adobe App Builder workspace configuration and IMS context, ensuring your local and deployed environments stay in sync.
 
 ## Testing
 
